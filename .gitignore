@@ -163,3 +163,4 @@ cython_debug/
 *.cfg
 *.exe
 config.json
+*local*
