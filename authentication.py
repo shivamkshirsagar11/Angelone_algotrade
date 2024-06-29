@@ -1,12 +1,12 @@
 from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
 import pyotp
 import json
+from file_handler import read_file, save_file
 
 config = {}
 
 def read_secreats():
-    with open('config_local.json', 'r') as config_file:
-        globals()['config'] = json.load(config_file)
+    globals()['config'] = read_file('config_local.json')
 
 def do_login():
     sObj = SmartConnect(api_key=config.get('api_key'))
@@ -17,12 +17,12 @@ def do_login():
     if data['status'] is True:
         data = data['data']
         jwt = data['jwtToken']
+        jwt = jwt.replace('Bearer ', '')
         feed = data['feedToken']
-        globals()['config'].update({'jwtToken':jwt, 'feedToken':feed})   
+        globals()['config'].update({'jwtToken':jwt, 'feedToken':feed}) 
 
 def update_secreats():
-    with open('complete_config_local.json', 'w') as file:
-        json.dump(globals()['config'], file, indent=4)
+    save_file('complete_config_local.json', globals()['config'])
 
 read_secreats()
 do_login()
