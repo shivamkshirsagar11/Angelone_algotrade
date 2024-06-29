@@ -17,8 +17,9 @@ def do_login():
     if data['status'] is True:
         data = data['data']
         jwt = data['jwtToken']
+        jwt = jwt.replace('Bearer ', '')
         feed = data['feedToken']
-        globals()['config'].update({'jwtToken':jwt, 'feedToken':feed})   
+        globals()['config'].update({'jwtToken':jwt, 'feedToken':feed}) 
 
 def update_secreats():
     save_file('complete_config_local.json', globals()['config'])
