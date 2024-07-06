@@ -1,6 +1,6 @@
 {
-    "increment":3,
-    "earliest":2,
-    "latest":0,
+    "increment":1,
+    "earliest":12,
+    "latest":11,
     "historicData":true
 }

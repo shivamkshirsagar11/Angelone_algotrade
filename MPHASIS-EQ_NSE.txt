@@ -1,0 +1,6 @@
+[2024-06-24 09:15] Started Monitoring Stock...
+[2024-06-24 09:15] First Candle Data: OHLC((2401.25, 2404.25, 2390.0, 2390.85))
+[2024-06-24 09:17] Trigger Candle Data: OHLC((2404.35, 2408.2, 2400.4, 2405.25))
+[2024-06-24 09:17] entryOnNextCandle = True, Target = 2420.8499999999995, StopLoss = 2400.4
+[2024-06-24 09:18] [BUY] previous candle triggered this candle for Entry OHLC((2405.25, 2409.8, 2402.0, 2404.0))
+[2024-06-24 09:19] [SELL] Selling the stock as StopLoss of 2400.4 is hit, OHLC((2405.45, 2407.95, 2396.2, 2398.75))

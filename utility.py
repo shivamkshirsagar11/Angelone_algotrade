@@ -28,6 +28,7 @@ def filter_dict(data, filters):
 def filter_ticker():
     tickers_data = read_file('tickers_local.json')
     filters = read_file('filter_local.json')
+    print(filters)
     filter_dict(tickers_data, filters)
 
 filter_ticker()
