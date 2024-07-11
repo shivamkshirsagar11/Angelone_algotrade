@@ -1,0 +1,30 @@
+---------------------------------- Middle trigger candle Stratagy ----------------------------------------------------------------
+
+
+
+
+# if firstHigh is None and not isSold:
+        #     firstHigh = high
+        #     firstLow = low
+        #     log_lines.append(f"[{start_time}] First Candle Data: OHLC({OPEN, high, low, close})\n")
+        # elif close >= firstHigh and not EntryOnNext and not waiting_for_sell and not isSold:
+        #     triggerHigh = high
+        #     triggerLow = low
+        #     EntryOnNext = True
+        #     target = close + 2 * abs(low - high)
+        #     stopLoss = low
+        #     log_lines.append(f"[{start_time}] Trigger Candle Data: OHLC({OPEN, high, low, close})\n")
+        #     log_lines.append(f"[{start_time}] entryOnNextCandle = True, Target = {target}, StopLoss = {stopLoss}\n")
+        # elif EntryOnNext and not isSold and not waiting_for_sell:
+        #     log_lines.append(f"[{start_time}] [BUY] previous candle triggered this candle for Entry OHLC({OPEN, high, low, close})\n")
+        #     waiting_for_sell = True
+        #     EntryOnNext = False
+        # elif waiting_for_sell and not isSold:
+        #     if close <= stopLoss:
+        #         log_lines.append(f"[{start_time}] [SELL] Selling the stock as StopLoss of {stopLoss} is hit, OHLC({OPEN, high, low, close})\n")
+        #         isSold = True
+        #         break
+        #     elif close >= target:
+        #         log_lines.append(f"[{start_time}] [SELL] Selling the stock as Target of {target} is hit, OHLC({OPEN, high, low, close})\n")
+        #         isSold = True
+        #         break
