@@ -1,9 +1,12 @@
 from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
 from threading import Thread
 from file_handler import read_file
+from authentication import processLogin
 from datetime import datetime, timedelta
 import json
 import time
+
+sObj = processLogin()
 
 config = {}
 filtered_stocks = []
@@ -30,6 +33,30 @@ def candle_time_mapping(increment):
 
 read_secreats()
 
+
+def BUY_STOCK(**params):
+    print("Buying stock..................")
+    defaultParams = {
+        "variety": "NORMAL",
+        "tradingsymbol": "IDEA-EQ",
+        "symboltoken": "14366",
+        "transactiontype": "BUY",
+        "exchange": "NSE",
+        "ordertype": "LIMIT",
+        "producttype": "INTRADAY",
+        "duration": "DAY",
+        "price": "16.58",
+        "squareoff": "0",
+        "stoploss": "0",
+        "quantity": "1"
+        }
+
+    defaultParams.update(params)
+    orderid = sObj.placeOrder(defaultParams)
+    print("Stock bought..................")
+    print(f"Order ID: {orderid}")
+
+
 def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
     ttime = datetime.now() if ttime == '' else datetime.strptime(ttime, "%Y-%m-%d %H:%M")
     ttime = ttime - timedelta(days=abs(days)) if days < 0 else ttime + timedelta(days=days)
@@ -39,8 +66,6 @@ def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
         ttime = ttime.replace(hour=abs(hours), minute=abs(minutes), second=seconds)
     return ttime.strftime("%Y-%m-%d %H:%M")
 
-sObj = SmartConnect(api_key=config.get('api_key'))
-sObj.setAccessToken(config.get('jwtToken'))
 
 trading_params = read_file("trading_params.json")
 
@@ -86,8 +111,8 @@ def get_historic_data(historic_params, start_time,filename='garbage.txt', increm
     
         start_time = time_calc(minutes=increments, ttime=start_time)
         print(f"next candle time: {start_time}")
-        time.sleep(1)
-        # time.sleep(trading_params["increment"] * 60)
+        # time.sleep(1)
+        time.sleep(trading_params["increment"] * 60)
     else:
         if not isSold:
             log_lines.append(f"[{start_time}] [SELL] Selling the stock as time is 3:15\n")
@@ -143,7 +168,7 @@ def time_difference(time1, time2):
     difference = abs(time2 - time1)
     return difference.total_seconds()
 
-def trading_for_stock(token, end_time, filename):
+def trading_for_stock(token, filename):
     firstCandle = None
     firstHigh = firstLow = None
     firstOpen = None
@@ -156,47 +181,50 @@ def trading_for_stock(token, end_time, filename):
     target = None
     stopLoss = None
     while not isCompleted:
-        data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": [f"{token}"]})
-        data = data['data']['fetched'][0]
-        ltp = float(data['ltp'])
-        tradeTime = data['exchFeedTime']
-        print("Current time: ", convert_utc_to_ist(tradeTime))
-        if time_difference(tradeTime, stoppingTime) <= 0:
-            log_lines.append(f"[{convert_utc_to_ist(tradeTime)}]No exit for today so sqaring off for 3:15\n")
-            break
-        if firstCandle is None:
-            firstCandle = tradeTime
-            firstHigh = ltp
-            firstLow = ltp
-            firstOpen = ltp
-            OPEN = firstOpen
-        elif firstCandle and candleMeet is False:
-            if candleTime < trading_params["increment"] * 60:
-                HIGH = max(firstHigh,ltp)
-                LOW = min(firstLow, ltp)
-                candleTime = time_difference(firstCandle, tradeTime)
-            
-            if candleTime >= trading_params["increment"] * 60:
-                CLOSE = ltp
-                candleMeet = True
-                target = HIGH
-                stopLoss = LOW / 1.00025
-                log_lines.append(f"1 Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
-                log_lines.append(f"Target = {target}, StopLoss = {stopLoss}\n")
-                log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][BUY] OHLC{OPEN, HIGH, LOW, CLOSE}\n")
-                print(candleTime, convert_utc_to_ist(firstCandle), convert_utc_to_ist(tradeTime))
-                print(f"OHLC({OPEN, HIGH, LOW, CLOSE})")
-        elif firstCandle is not None and candleMeet is True:
-            if ltp >= target:
-                log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] Target = {target} is Hit, price = {ltp}\n")
-                isCompleted = True
-            if ltp <= stopLoss:
-                log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] StopLoss = {stopLoss} is Met, price = {ltp}\n")
-                isCompleted = True            
-        if not candleMeet:
-            time.sleep((trading_params['increment'] * 60) - 1)
-        else:
+        try:
+            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": [f"{token}"]})
+            data = data['data']['fetched'][0]
+            ltp = float(data['ltp'])
+            tradeTime = data['exchFeedTime']
+            print("Current time: ", convert_utc_to_ist(tradeTime))
+            if time_difference(tradeTime, stoppingTime) <= 0:
+                log_lines.append(f"[{convert_utc_to_ist(tradeTime)}]No exit for today so sqaring off for 3:15\n")
+                break
+            if firstCandle is None:
+                firstCandle = tradeTime
+                firstHigh = ltp
+                firstLow = ltp
+                firstOpen = ltp
+                OPEN = firstOpen
+            elif firstCandle and candleMeet is False:
+                if candleTime < trading_params["increment"] * 60:
+                    HIGH = max(firstHigh,ltp)
+                    LOW = min(firstLow, ltp)
+                    candleTime = time_difference(firstCandle, tradeTime)
+                
+                if candleTime >= trading_params["increment"] * 60:
+                    CLOSE = ltp
+                    candleMeet = True
+                    target = HIGH
+                    stopLoss = LOW / 1.00025
+                    log_lines.append(f"1 Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
+                    log_lines.append(f"Target = {target}, StopLoss = {stopLoss}\n")
+                    log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][BUY] OHLC{OPEN, HIGH, LOW, CLOSE}\n")
+                    print(candleTime, convert_utc_to_ist(firstCandle), convert_utc_to_ist(tradeTime))
+                    print(f"OHLC({OPEN, HIGH, LOW, CLOSE})")
+            elif firstCandle is not None and candleMeet is True:
+                if ltp >= target:
+                    log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] Target = {target} is Hit, price = {ltp}\n")
+                    isCompleted = True
+                if ltp <= stopLoss:
+                    log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] StopLoss = {stopLoss} is Met, price = {ltp}\n")
+                    isCompleted = True            
             time.sleep(3)
+        except Exception as e:
+            print(e)
+            print(token)
+            time.sleep(3)
+
     else:
         if not isCompleted:
             log_lines.append(f"[SELL] selling the stock as end of market time")
@@ -207,13 +235,14 @@ def trading_for_stock(token, end_time, filename):
 if trading_params["historicData"] is False:
     read_filtered()
     sObj.timeout = trading_params["increment"] * 60
-    end_time = time_calc(hours=10, minutes=0, replace=True)
     threads = []
     for stock in filtered_stocks:
-        thread = Thread(target=trading_for_stock, args=(stock["token"], end_time,f"liveTrading/{stock['symbol']}.txt"))
+        thread = Thread(target=trading_for_stock, args=(stock["token"], f"liveTrading/{stock['symbol']}.txt"))
         threads.append(thread)
         thread.start()
         time.sleep(1)
 
     for thread in threads:
         thread.join()
+
+BUY_STOCK()
