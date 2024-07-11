@@ -45,7 +45,7 @@ def BUY_STOCK(**params):
         "ordertype": "LIMIT",
         "producttype": "INTRADAY",
         "duration": "DAY",
-        "price": "16.58",
+        "price": "16.59",
         "squareoff": "0",
         "stoploss": "0",
         "quantity": "1"
@@ -56,7 +56,8 @@ def BUY_STOCK(**params):
     print("Stock bought..................")
     print(f"Order ID: {orderid}")
 
-
+# BUY_STOCK()
+# time.sleep(100)
 def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
     ttime = datetime.now() if ttime == '' else datetime.strptime(ttime, "%Y-%m-%d %H:%M")
     ttime = ttime - timedelta(days=abs(days)) if days < 0 else ttime + timedelta(days=days)
@@ -205,8 +206,8 @@ def trading_for_stock(token, filename):
                 if candleTime >= trading_params["increment"] * 60:
                     CLOSE = ltp
                     candleMeet = True
-                    target = HIGH
-                    stopLoss = LOW / 1.00025
+                    target = HIGH + abs(LOW - HIGH)
+                    stopLoss = round(LOW / 1.00025, 2)
                     log_lines.append(f"1 Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
                     log_lines.append(f"Target = {target}, StopLoss = {stopLoss}\n")
                     log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][BUY] OHLC{OPEN, HIGH, LOW, CLOSE}\n")
@@ -244,5 +245,3 @@ if trading_params["historicData"] is False:
 
     for thread in threads:
         thread.join()
-
-BUY_STOCK()
