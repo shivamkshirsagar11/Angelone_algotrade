@@ -158,15 +158,18 @@ def convert_utc_to_ist(utc_time_str):
 def get_stopping_time():
     today = datetime.now()
     today = today.replace(hour=3, minute=14, second=0)
-    return datetime.now().strftime("%d-%b-%Y %H:%M:%S")
+    return today.strftime("%d-%b-%Y %H:%M:%S")
 
 def parse_ist_time(ist_time_str):
     return datetime.strptime(ist_time_str, "%d-%b-%Y %H:%M:%S")
 
-def time_difference(time1, time2):
+def time_difference(time1, time2, isLive=False):
     time1 = parse_ist_time(time1)
     time2 = parse_ist_time(time2)
-    difference = abs(time2 - time1)
+    if not isLive:
+        difference = abs(time2 - time1)
+    else:
+        difference = time1 - time2
     return difference.total_seconds()
 
 def trading_for_stock(token, filename):
@@ -188,7 +191,7 @@ def trading_for_stock(token, filename):
             ltp = float(data['ltp'])
             tradeTime = data['exchFeedTime']
             print("Current time: ", convert_utc_to_ist(tradeTime))
-            if time_difference(tradeTime, stoppingTime) <= 0:
+            if time_difference(tradeTime, stoppingTime, True) <= 0:
                 log_lines.append(f"[{convert_utc_to_ist(tradeTime)}]No exit for today so sqaring off for 3:15\n")
                 break
             if firstCandle is None:
