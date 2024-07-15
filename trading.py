@@ -82,7 +82,10 @@ def get_historic_data(historic_params, start_time,filename='garbage.txt', increm
     waiting_for_sell = False
     EntryOnNext = False
     entry = None
-
+    # historic_params["fromdate"] = start_time
+    # historic_params["todate"] = time_calc(minutes=increments-1, ttime=start_time)
+    # data = sObj.getCandleData(historic_params)
+    # print(json.dumps(data, indent=4))
     while start_time != stop_time and not isSold:
         historic_params["fromdate"] = start_time
         historic_params["todate"] = time_calc(minutes=increments-1, ttime=start_time)
@@ -122,11 +125,9 @@ def get_historic_data(historic_params, start_time,filename='garbage.txt', increm
         f.writelines(log_lines)
 
 
-
-if trading_params["historicData"] is True:
+if trading_params["testing"] is False and trading_params["historicData"] is True:
     read_filtered()
-    start_time = time_calc(days=-trading_params['earliest'], hours=9, minutes=15, replace=True)
-    end_time = time_calc(minutes=trading_params["increment"], ttime=start_time)
+    start_time = time_calc(days=-trading_params['earliest'], hours=9, minutes=30, replace=True)
     threads = []
     for stock in filtered_stocks:
         historicParam={
@@ -234,9 +235,63 @@ def trading_for_stock(token, filename):
             log_lines.append(f"[SELL] selling the stock as end of market time")
         with open(filename, 'w') as f:
             f.writelines(log_lines)
-    
 
-if trading_params["historicData"] is False:
+
+def wait_till_next_minute(delta=0):
+    import time
+
+    print("waiting till the next minute starts...")
+    time.sleep(60 - delta - time.localtime().tm_sec)
+
+
+def read_stocks_and_filter(file_path):
+    import pandas as pd
+    # Load the CSV file
+    data = pd.read_csv(file_path)
+    
+    # Convert the '% Chg' column to numeric values
+    data['% Chg'] = data['% Chg'].str.rstrip('%').astype(float)
+    
+    # Filter the stocks with percentage change between 1.25 and 2.5
+    filtered_stocks = data[(data['% Chg'] >= 1.25) & (data['% Chg'] <= 2.5)]
+    
+    # Append "-EQ" to the stock symbols
+    filtered_stocks['Symbol'] = filtered_stocks['Symbol'] + '-EQ'
+    
+    # Get the list of filtered stock symbols
+    stock_symbols = filtered_stocks['Symbol'].tolist()
+    
+    return stock_symbols
+
+def wait_for_stocks_files(fileprefix:str=trading_params['increment']):
+    data = None
+    import os
+    file_found = False
+    print(f"Waiting for {fileprefix}m.csv....")
+    while not file_found:
+        if os.path.exists(f"{fileprefix}m.csv") and os.path.isfile(f"{fileprefix}m.csv"):
+            file_found = True
+            print(f"{fileprefix}m.csv Found!")
+        else:
+            time.sleep(0.05)
+    data = read_stocks_and_filter(f"{fileprefix}m.csv")
+    
+    print("saving stocks to loacal filter json file...")
+    with open("filter_local.json", 'w') as file:
+        demo = {
+            "symbol":data
+        }
+
+        json.dump(demo, file)
+    
+    print("filtering the stocks and saving important information...")
+    os.system("python utility.py")
+    os.system(f"rename {trading_params['increment']}m.csv {trading_params['increment']}m-old.csv")
+
+wait_for_stocks_files()
+
+if trading_params["testing"] is False and trading_params["historicData"] is False:
+    wait_for_stocks_files()
     read_filtered()
     sObj.timeout = trading_params["increment"] * 60
     threads = []
