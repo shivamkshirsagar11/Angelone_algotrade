@@ -200,7 +200,7 @@ def trading_for_stock(stock, filename):
                 log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][TIMEOUT] Preparing for exit...\n")
                 break
             if firstCandle is None:
-                start_time = time_calc(days=-trading_params['earliest'], hours=9, minutes=15, replace=True)
+                start_time = time_calc(hours=9, minutes=15, replace=True)
                 stop_time = time_calc(minutes=historicParam['increment'] - 1, ttime=start_time)
                 historicParam={
                 "exchange": stock['exch_seg'],
