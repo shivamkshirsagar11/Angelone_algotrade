@@ -2,6 +2,6 @@
     "increment":5,
     "earliest":0,
     "latest":0,
-    "historicData":true,
+    "historicData":false,
     "testing":false
 }
