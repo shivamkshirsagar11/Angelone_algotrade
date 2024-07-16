@@ -1,4 +1,0 @@
-1 Minute candle found: OHLC(569.0, 569.2, 569.0, 569.2)
-Target = 569.2, StopLoss = 568.8577855536115
-[11-Jul-2024 10:07:29][BUY] OHLC(569.0, 569.2, 569.0, 569.2)
-[11-Jul-2024 10:07:34][SELL] Target = 569.2 is Hit, price = 569.45

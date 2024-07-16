@@ -3,5 +3,5 @@
     "earliest":0,
     "latest":0,
     "historicData":true,
-    "testing":true
+    "testing":false
 }

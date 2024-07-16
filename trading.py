@@ -156,9 +156,9 @@ def convert_utc_to_ist(utc_time_str):
     ist_time_str = ist_time.strftime("%d-%b-%Y %H:%M:%S")
     return ist_time_str
 
-def get_stopping_time():
+def get_stopping_time(hour=3, minute=14):
     today = datetime.now()
-    today = today.replace(hour=3, minute=14, second=0)
+    today = today.replace(hour=hour, minute=minute, second=0)
     return today.strftime("%d-%b-%Y %H:%M:%S")
 
 def parse_ist_time(ist_time_str):
@@ -184,7 +184,7 @@ def trading_for_stock(stock, filename):
     OPEN = HIGH = LOW = CLOSE = None
     isCompleted = False
     log_lines = []
-    stoppingTime = get_stopping_time()
+    stoppingTime = get_stopping_time(hour=11, minute=0)
     candleMeet = False
     target = None
     stopLoss = None
@@ -197,7 +197,7 @@ def trading_for_stock(stock, filename):
             tradeTime = data['exchFeedTime']
             print("Current time: ", convert_utc_to_ist(tradeTime))
             if time_difference(tradeTime, stoppingTime, True) <= 0:
-                log_lines.append(f"[{convert_utc_to_ist(tradeTime)}]No exit for today so sqaring off for 3:15\n")
+                log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][TIMEOUT] Preparing for exit...\n")
                 break
             if firstCandle is None:
                 start_time = time_calc(days=-trading_params['earliest'], hours=9, minutes=15, replace=True)
@@ -239,7 +239,11 @@ def trading_for_stock(stock, filename):
 
     else:
         if not isCompleted:
-            log_lines.append(f"[SELL] selling the stock as end of market time")
+            if isBought:
+                log_lines.append(f"[SELL] selling the stock as end of market time\n")
+            else:
+                log_lines.append(f"[NO-ENTRY-EXIT] No entry for stock\n")
+                log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)\n")
         with open(filename, 'w') as f:
             f.writelines(log_lines)
 
@@ -295,7 +299,6 @@ def wait_for_stocks_files(fileprefix:str=trading_params['increment']):
     os.system("python utility.py")
     os.system(f"rename {trading_params['increment']}m.csv {trading_params['increment']}m-old.csv")
 
-wait_for_stocks_files()
 
 if trading_params["testing"] is False and trading_params["historicData"] is False:
     wait_for_stocks_files()
