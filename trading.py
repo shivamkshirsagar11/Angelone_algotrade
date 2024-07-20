@@ -5,6 +5,7 @@ from authentication import processLogin
 from datetime import datetime, timedelta
 import json
 import time
+import random
 
 sObj = processLogin()
 
@@ -34,26 +35,30 @@ def candle_time_mapping(increment):
 read_secreats()
 
 
-def BUY_STOCK(**params):
-    print("Buying stock..................")
+def TRADE_STOCK(**params):
+    if params['transactiontype'] == "BUY":
+        print(f"Buying stock at price = {params['price']}")
+    if params['transactiontype'] == "SELL":
+        print(f"Selling stock at price = {params['price']}")
     defaultParams = {
         "variety": "NORMAL",
         "tradingsymbol": "IDEA-EQ",
         "symboltoken": "14366",
         "transactiontype": "BUY",
         "exchange": "NSE",
-        "ordertype": "LIMIT",
+        "ordertype": "MARKET",
         "producttype": "INTRADAY",
         "duration": "DAY",
         "price": "16.59",
-        "squareoff": "0",
-        "stoploss": "0",
         "quantity": "1"
         }
 
     defaultParams.update(params)
     orderid = sObj.placeOrder(defaultParams)
-    print("Stock bought..................")
+    if defaultParams['transactiontype'] == "BUY":
+        print("Stock bought..................")
+    if defaultParams['transactiontype'] == "SELL":
+        print("Stock sold..................")
     print(f"Order ID: {orderid}")
 
 # BUY_STOCK()
@@ -154,7 +159,7 @@ def convert_utc_to_ist(utc_time_str):
     
     # Format the IST time back to string
     ist_time_str = ist_time.strftime("%d-%b-%Y %H:%M:%S")
-    return ist_time_str
+    return utc_time_str
 
 def get_stopping_time(hour=3, minute=14):
     today = datetime.now()
@@ -183,7 +188,7 @@ def trading_for_stock(stock, filename):
         OPEN = HIGH = LOW = CLOSE = None
         isCompleted = False
         log_lines = []
-        stoppingTime = get_stopping_time(hour=11, minute=0)
+        stoppingTime = get_stopping_time(hour=15, minute=15)
         candleMeet = False
         target = None
         stopLoss = None
@@ -194,7 +199,7 @@ def trading_for_stock(stock, filename):
                 data = data['data']['fetched'][0]
                 ltp = float(data['ltp'])
                 tradeTime = data['exchFeedTime']
-                print(f"[{stock['symbol']}] {convert_utc_to_ist(tradeTime)}")
+                print(f"[{stock['symbol']}] {convert_utc_to_ist(tradeTime)}, {firstCandle}, {time_difference(tradeTime,stoppingTime), {stoppingTime}}")
 
                 if time_difference(tradeTime,stoppingTime) > 0:
                     log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][TIMEOUT] Preparing for exit...\n")
@@ -243,7 +248,7 @@ def trading_for_stock(stock, filename):
                         log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] StopLoss = {stopLoss} is Met, price = {ltp}\n")
                         log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)")
                         break            
-                time.sleep(3)
+                time.sleep(3 + random.uniform(0.01, 0.1))
             except Exception as e:
                 print(e)
                 print(token)
@@ -320,7 +325,50 @@ if trading_params["testing"] is False and trading_params["historicData"] is Fals
         thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt"))
         threads.append(thread)
         thread.start()
-        time.sleep(1)
+        if len(threads) % 3 == 0:
+            time.sleep(1)
 
     for thread in threads:
-        thread.join()
+        thread.join() 
+
+
+if trading_params["testing"] is True:
+    print("....buy sell stock demo....")
+
+    for i in range(2):
+        if i % 2 == 0:
+            defaultParams = {
+            "variety": "NORMAL",
+            "tradingsymbol": "IDEA-EQ",
+            "symboltoken": "14366",
+            "transactiontype": "BUY",
+            "exchange": "NSE",
+            "ordertype": "MARKET",
+            "producttype": "INTRADAY",
+            "duration": "DAY",
+            "price": "16.59",
+            "quantity": "1"
+            }
+            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": ["14366"]})
+            data = data['data']['fetched'][0]
+            defaultParams['price'] = data['ltp']
+            TRADE_STOCK(**defaultParams)
+            print("Sleeping for 10 seconds for sell....")
+            time.sleep(10)
+        elif i % 2:
+            defaultParams = {
+            "variety": "NORMAL",
+            "tradingsymbol": "IDEA-EQ",
+            "symboltoken": "14366",
+            "transactiontype": "SELL",
+            "exchange": "NSE",
+            "ordertype": "MARKET",
+            "producttype": "INTRADAY",
+            "duration": "DAY",
+            "price": "16.59",
+            "quantity": "1"
+            }
+            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": ["14366"]})
+            data = data['data']['fetched'][0]
+            defaultParams['price'] = data['ltp']
+            TRADE_STOCK(**defaultParams)
