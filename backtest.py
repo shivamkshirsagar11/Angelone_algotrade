@@ -202,7 +202,7 @@ def backtest(instrument, earliest):
                 csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
                 sold = True
                 break
-            if ohlc[-1] <= trade_config['stoploss']:
+            elif ohlc[-1] <= trade_config['stoploss']:
                 exit_time = fromdate
                 exitt = ohlc[-1]
                 trade_type = "STOPLOSS"
