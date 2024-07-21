@@ -12,7 +12,7 @@ backtest_main_logger = logging.getLogger('backtest_main_logger')
 backtest_main_logger.setLevel(logging.DEBUG)
 
 # Create a file handler
-fh = logging.FileHandler('backtest_main_logger.log')
+fh = logging.FileHandler('backtest_main_logger.log', mode='w')
 fh.setLevel(logging.DEBUG)
 
 # Create a formatter and set it to the handler
@@ -79,10 +79,10 @@ def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
 def get_stopping_time(hour=3, minute=14, today=''):
     today = datetime.now() if today == '' else datetime.strptime(today, "%Y-%m-%d %H:%M")
     today = today.replace(hour=hour, minute=minute, second=0)
-    return today.strftime("%Y-%m-%d %H:%MS")
+    return today.strftime("%Y-%m-%d %H:%M")
 
 def parse_ist_time(ist_time_str):
-    return datetime.strptime(ist_time_str, "%Y-%m-%d %H:%MS")
+    return datetime.strptime(ist_time_str, "%Y-%m-%d %H:%M")
 
 def time_difference(time1, time2):
     time1 = parse_ist_time(time1)
@@ -125,18 +125,25 @@ def backtest(instrument, earliest):
     exit_time = ''
     trade_type = ''
     entry = ''
-    exit = ''
+    exitt = ''
     profit = ''
     csv_lines = []
+    waiting_for_sell = True
+    sold = False
+    bought = False
+    error = False
+    ohlc = None
 
     while True:
         if not first_candle:
             fromdate = time_calc(days = -earliest, minutes=15, hours=12, replace=True)
-            todate = time_calc(ttime=fromdate, minutes=44, hours=12, replace=True)
-            backtest_main_logger.info(f"[backtest][first_candle] {instrument['name']} fromdate={fromdate}, todate={todate}")
+            todate = time_calc(ttime=fromdate, minutes=45, hours=12, replace=True)
+            stop_time = get_stopping_time(hour=15, minute=15, today=fromdate)
+            backtest_main_logger.info(f"[backtest][first_candle] {instrument['name']} fromdate={fromdate}, todate={todate}, {stop_time}")
         
         else:
             if first_time_after_first_candle:
+                fromdate = todate
                 todate = time_calc(ttime=fromdate, minutes=increment)
                 first_time_after_first_candle = False
             else:
@@ -144,6 +151,7 @@ def backtest(instrument, earliest):
                 todate = time_calc(ttime=fromdate, minutes=increment)
         
         if time_difference(fromdate, stop_time) >= 0:
+            backtest_main_logger.info(f"[backtest][time difference] {fromdate}:{todate}, {time_difference(fromdate, stop_time)}")
             break
         
         historicParam={
@@ -156,9 +164,10 @@ def backtest(instrument, earliest):
 
         backtest_main_logger.info(f"[backtest]{instrument['name']} fromdate={fromdate}, todate={todate}, getting candle data")
         ohlc = getHistoricOHLC(historicParam)
-        if not first_candle and ohlc[0] == -1:
+        if ohlc and not first_candle and ohlc[0] == -1:
             backtest_main_logger.critical(f"[backtest] Some error occured so skipping this day")
-            return
+            error = True
+            break
         elif not first_candle:
             first_candle = True
             trade_config = {
@@ -173,7 +182,7 @@ def backtest(instrument, earliest):
             trade_config["high"] = ohlc[1]
             trade_config["low"] = ohlc[2]
             trade_config["close"] = ohlc[3]
-            trade_config["stoploss"] = trade_config["low"]
+            trade_config["stoploss"] = trade_config["high"] - (abs(trade_config["high"] - trade_config['low']) // 2)
             increment = 3
             first_candle = True
             continue
@@ -181,28 +190,55 @@ def backtest(instrument, earliest):
             if ohlc[-1] >= trade_config["high"]:
                 trigger_candle = True
                 trade_config["target"] = ohlc[1] + abs(ohlc[1] - trade_config['low'])
-                entry = fromdate
-
-
-
+                entry_time = fromdate
+                entry = ohlc[1]
+                bought = True
+        elif first_candle and trigger_candle and waiting_for_sell:
+            if ohlc[-1] >= trade_config['target']:
+                exit_time = fromdate
+                exitt = ohlc[-1]
+                trade_type = "TARGET"
+                profit = ohlc[-1] - trade_config['high']
+                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
+                sold = True
+                break
+            if ohlc[-1] <= trade_config['stoploss']:
+                exit_time = fromdate
+                exitt = ohlc[-1]
+                trade_type = "STOPLOSS"
+                profit = ohlc[-1] - trade_config['high']
+                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
+                sold = True
+                break
+        time.sleep(1)
+    if not error and not sold and bought:
+        exit_time = stop_time
+        exitt = ohlc[-1]
+        trade_type = "EXIT_3_15"
+        profit = ohlc[-1] - trade_config['high']
+        csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
+    return csv_lines
 
 
 def iterate_filtered_stocks():
+    sObj.timeout = 300
     backtest_main_logger.info("[iterate_filtered_stocks] reading filtered stocks")
     read_filtered()
     backtest_main_logger.info("[iterate_filtered_stocks] filtered stocks read")
     count = 0
-    for backtime in range(backtest_params['earliest'], 0, -1):
-        backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtesting for -{backtime}")
-        for instrument in filtered_stocks:
+    for instrument in filtered_stocks:
+        backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtest for {instrument['name']}")
+        data = []
+        csv_header = ["Entry Time", "Exit Time", "Trade Type", "Entry", "Exit", "Profit"]
+        data.append(csv_header.copy())
+        filename = f"backtest/{instrument['name']}.csv"
+        for backtime in range(backtest_params['earliest'], 0, -1):
             count += 1
-            backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtest for {instrument['name']}")
-            filename = f"{instrument['name']}.csv"
-            csv_header = ["Entry Time", "Exit Time", "Trade Type", "Entry", "Exit", "Profit"]
-            result = backtest(instrument, backtime)
-            if count % 3 == 0:
-                backtest_main_logger.info("[iterate_filtered_stocks] Sleeping as limit rate will not hit")
-                time.sleep(1)
+            backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtesting for -{backtime}")
+            result_for_day = backtest(instrument, backtime)
+            if result_for_day:
+                data.append(result_for_day.copy())
+        csv_writer(data, filename)
 
 if __name__ == "__main__":
     backtest_main_logger.info("[mainif] Starting iterating over earliest time")
