@@ -1,4 +1,9 @@
 {
-    "increment":30,
-    "earliest":180
+    "fi":30,
+    "si":3,
+    "start_time_hr":12,
+    "start_time_min":15,
+    "end_time_hr":15,
+    "end_time_min":15,
+    "earliest":365
 }

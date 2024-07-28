@@ -62,10 +62,10 @@ def getHistoricOHLC(params):
         data = sObj.getCandleData(historicDataParams=params)
         [_, OPEN, high, low, close,_] = data['data'][0]
         backtest_main_logger.info(f"[getHistoricOHLC] candle data fetched successfull")
-        return OPEN, high, low, close
+        return data['data']
     except Exception as e:
         backtest_main_logger.error(f"[getHistoricOHLC] ERROR={e}")
-        return -1, -1, -1, -1
+        return []
 
 def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
     ttime = datetime.now() if ttime == '' else datetime.strptime(ttime, "%Y-%m-%d %H:%M")
@@ -85,11 +85,13 @@ def parse_ist_time(ist_time_str):
     return datetime.strptime(ist_time_str, "%Y-%m-%d %H:%M")
 
 def time_difference(time1, time2):
-    time1 = parse_ist_time(time1)
-    time2 = parse_ist_time(time2)
-    
-    difference = time1 - time2
-    return difference.total_seconds()
+    if time1 and time2:
+        time1 = parse_ist_time(time1)
+        time2 = parse_ist_time(time2)
+        
+        difference = time1 - time2
+        return difference.total_seconds()
+    return 0
 
 def csv_writer(data, filename):
     """
@@ -103,14 +105,35 @@ def csv_writer(data, filename):
         writer = csv.writer(file)
         writer.writerows(data)
 
-def backtest(instrument, earliest):
+def batchwise_get_candle_from_bulk(candledata, bind_candles, iterated_candles, start_time):
+    backtest_main_logger.info(f"batchwise getting batches of candles...[{start_time}]")
+    count = 0
+    MIN, MAX, OPEN, CLOSE, Date = float("inf"), float("-inf"), None, None, None
+
+    while iterated_candles < len(candledata) and count != bind_candles:
+        [Date, O, H, L, C,_] = candledata[iterated_candles]
+        Date = datetime.strptime(Date, "%Y-%m-%dT%H:%M:%S%z")
+        Date = Date.strftime("%Y-%m-%d %H:%M")
+        if time_difference(Date, start_time) < 0:
+            backtest_main_logger.info(f"[SKIP] {Date} till {start_time}")
+            iterated_candles += 1
+        else:
+            CLOSE = C
+            MIN = min(L, MIN)
+            MAX = max(H, MAX)
+            if OPEN is None:
+                backtest_main_logger.info(f"batchwise getting batches of candles starting[{Date}]")
+                OPEN = O
+            count += 1
+            iterated_candles += 1
+    return OPEN, MAX, MIN, CLOSE, iterated_candles, Date
+
+def backtest(instrument, candles, earliest):
     backtest_main_logger.info(f"[backtest] backtesting for {instrument['name']}")
-    increment = backtest_params["increment"]
+    increment = backtest_params["fi"]
 
     first_candle = False
-    first_time_after_first_candle = True
     trigger_candle = False
-    fromdate = None
     todate = None
     trade_config = {
         "open":None,
@@ -120,7 +143,6 @@ def backtest(instrument, earliest):
         "target":None,
         "stoploss":None
     }
-    stop_time = get_stopping_time(hour=3, minute=15)
     entry_time = ''
     exit_time = ''
     trade_type = ''
@@ -133,63 +155,37 @@ def backtest(instrument, earliest):
     bought = False
     error = False
     ohlc = None
-
+    iterated_candles = 0
+    start_time = time_calc(days = -earliest, minutes=backtest_params["start_time_min"], hours=backtest_params["start_time_hr"], replace=True)
+    stop_time = get_stopping_time(hour=backtest_params["end_time_hr"], minute=backtest_params["end_time_min"], today=start_time)
     while True:
-        if not first_candle:
-            fromdate = time_calc(days = -earliest, minutes=15, hours=12, replace=True)
-            todate = time_calc(ttime=fromdate, minutes=45, hours=12, replace=True)
-            stop_time = get_stopping_time(hour=15, minute=15, today=fromdate)
-            backtest_main_logger.info(f"[backtest][first_candle] {instrument['name']} fromdate={fromdate}, todate={todate}, {stop_time}")
-        
-        else:
-            if first_time_after_first_candle:
-                fromdate = todate
-                todate = time_calc(ttime=fromdate, minutes=increment)
-                first_time_after_first_candle = False
-            else:
-                fromdate = todate
-                todate = time_calc(ttime=fromdate, minutes=increment)
-        
+        data = batchwise_get_candle_from_bulk(candles, increment, iterated_candles, start_time)
+        ohlc = data[:4]
+        iterated_candles, fromdate = data[4:]
+        backtest_main_logger.info(f"[backtest][{fromdate}] data={data}")
+
         if time_difference(fromdate, stop_time) >= 0:
             backtest_main_logger.info(f"[backtest][time difference] {fromdate}:{todate}, {time_difference(fromdate, stop_time)}")
             break
-        
-        historicParam={
-        "exchange": instrument['exch_seg'],
-        "symboltoken": instrument['token'],
-        "interval": candle_time_mapping(increment),
-        "fromdate":fromdate,
-        "todate":todate
-        }
 
-        backtest_main_logger.info(f"[backtest]{instrument['name']} fromdate={fromdate}, todate={todate}, getting candle data")
-        ohlc = getHistoricOHLC(historicParam)
-        if ohlc and not first_candle and ohlc[0] == -1:
+        if ohlc and not first_candle and ohlc[0] is None:
             backtest_main_logger.critical(f"[backtest] Some error occured so skipping this day")
             error = True
             break
         elif not first_candle:
             first_candle = True
-            trade_config = {
-                "open":None,
-                "high":None,
-                "low":None,
-                "close":None,
-                "target":None,
-                "stoploss":None
-            }
             trade_config["open"] = ohlc[0]
             trade_config["high"] = ohlc[1]
             trade_config["low"] = ohlc[2]
             trade_config["close"] = ohlc[3]
-            trade_config["stoploss"] = trade_config["high"] - (abs(trade_config["high"] - trade_config['low']) // 2)
-            increment = 3
+            increment = backtest_params["si"]
             first_candle = True
             continue
         elif first_candle and not trigger_candle:
             if ohlc[-1] >= trade_config["high"]:
                 trigger_candle = True
                 trade_config["target"] = ohlc[1] + abs(ohlc[1] - trade_config['low'])
+                trade_config["stoploss"] = ohlc[1] - (abs(ohlc[1] - trade_config['low']) // 2)
                 entry_time = fromdate
                 entry = ohlc[1]
                 bought = True
@@ -210,7 +206,6 @@ def backtest(instrument, earliest):
                 csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
                 sold = True
                 break
-        time.sleep(1)
     if not error and not sold and bought:
         exit_time = stop_time
         exitt = ohlc[-1]
@@ -219,23 +214,64 @@ def backtest(instrument, earliest):
         csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
     return csv_lines
 
+def group_day_wise(data):
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    backtest_main_logger.info(f"grouping {len(data)} number of candles by days")
+
+    for row in data:
+        date = row[0].split("T")[0]
+        grouped[date].append(row)
+    
+    return grouped
+
+def get_dynamic_data(days, stock):
+    backtest_main_logger.info(f"Getting dynamic data in bulk for -{days} days")
+    data = []
+    todate_date = -1
+    historicParam={
+        "exchange": stock['exch_seg'],
+        "symboltoken": stock['token'],
+        "interval": candle_time_mapping(1)
+        }
+    while days > 0 and todate_date <= 0:
+        todate_date = min(0, -days + 30)
+        fromdate = time_calc(days = -days, minutes=15, hours=9, replace=True)
+        todate = time_calc(days = todate_date, minutes=30, hours=15, replace=True)
+        backtest_main_logger.info(f"Getting dynamic data for {fromdate} -> {todate}")
+        historicParam['fromdate'] = fromdate
+        historicParam['todate'] = todate
+        data.extend(getHistoricOHLC(historicParam))
+        days = abs(todate_date) - 1
+        time.sleep(1.5)
+    
+    return group_day_wise(data)
+
+def date_difference(date_str):
+    # Parse the given date string
+    given_date = datetime.strptime(date_str, '%Y-%m-%d')
+    # Get today's date
+    today_date = datetime.today()
+    # Calculate the difference in days
+    difference = today_date - given_date
+    return difference.days
 
 def iterate_filtered_stocks():
     sObj.timeout = 300
     backtest_main_logger.info("[iterate_filtered_stocks] reading filtered stocks")
     read_filtered()
     backtest_main_logger.info("[iterate_filtered_stocks] filtered stocks read")
-    count = 0
     for instrument in filtered_stocks:
         backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtest for {instrument['name']}")
         data = []
         csv_header = ["Entry Time", "Exit Time", "Trade Type", "Entry", "Exit", "Profit"]
         data.append(csv_header.copy())
         filename = f"backtest/{instrument['name']}.csv"
-        for backtime in range(backtest_params['earliest'], 0, -1):
-            count += 1
+        stocks_data = get_dynamic_data(backtest_params['earliest'], instrument)
+        for back_day, candles in stocks_data.items():
+            backtime = date_difference(back_day)
             backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtesting for -{backtime}")
-            result_for_day = backtest(instrument, backtime)
+            result_for_day = backtest(instrument, candles, backtime)
             if result_for_day:
                 data.append(result_for_day.copy())
         csv_writer(data, filename)
@@ -243,3 +279,26 @@ def iterate_filtered_stocks():
 if __name__ == "__main__":
     backtest_main_logger.info("[mainif] Starting iterating over earliest time")
     iterate_filtered_stocks()
+    # fromdate = time_calc(days = -30, minutes=15, hours=9, replace=True)
+    # todate = time_calc(days = -1, minutes=30, hours=15, replace=True)
+    # historicParam={
+    #     "exchange": "NSE",
+    #     "symboltoken": "99926009",
+    #     "interval": candle_time_mapping(1),
+    #     "fromdate":fromdate,
+    #     "todate":todate
+    #     }
+    # data = getHistoricOHLC(historicParam)
+
+    # print(f"Getting 30 days data")
+    # unique = set()
+    # for row in data:
+    #     print(row)
+    #     date = row[0].split("T")[0]
+    #     unique.add(date)
+    
+    # print(f"start date={fromdate}")
+    # print(f"end date={todate}")
+    # for d in unique:
+    #     print(d)
+
