@@ -41,30 +41,25 @@ read_secreats()
 
 
 def TRADE_STOCK(**params):
-    if params['transactiontype'] == "BUY":
-        print(f"Buying stock at price = {params['price']}")
-    if params['transactiontype'] == "SELL":
-        print(f"Selling stock at price = {params['price']}")
-    defaultParams = {
-        "variety": "NORMAL",
-        "tradingsymbol": "ASHOKLEY-EQ",
-        "symboltoken": "14366",
-        "transactiontype": "BUY",
-        "exchange": "NSE",
-        "ordertype": "MARKET",
-        "producttype": "INTRADAY",
-        "duration": "DAY",
-        "price": "16.59",
-        "quantity": "1"
-        }
+    try:
+        defaultParams = {
+            "variety": "<STOCK-VAR>",
+            "tradingsymbol": "<STOCK-SYMBOL>",
+            "symboltoken": "<STOCK-TOKEN>",
+            "transactiontype": "<STOCK-CALL>",
+            "exchange": "<STOCK-AUTHORITY>",
+            "ordertype": "<STOCK-OT>",
+            "producttype": "<STOCK-PT>",
+            "duration": "<STOCK-D>",
+            "price": "<STOCK-PRICE>",
+            "quantity": "<STOCK-QTY>"
+            }
 
-    defaultParams.update(params)
-    orderid = sObj.placeOrder(defaultParams)
-    if defaultParams['transactiontype'] == "BUY":
-        print("Stock bought..................")
-    if defaultParams['transactiontype'] == "SELL":
-        print("Stock sold..................")
-    print(f"Order ID: {orderid}")
+        defaultParams.update(params)
+        sObj.placeOrder(defaultParams)
+    except Exception as e:
+        print(e)
+
 
 def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
     ttime = datetime.now() if ttime == '' else datetime.strptime(ttime, "%Y-%m-%d %H:%M")
@@ -202,8 +197,6 @@ def trading_for_stock(stock, filename, index):
                 data = data['data']['fetched'][0]
                 ltp = float(data['ltp'])
                 tradeTime = data['exchFeedTime']
-                
-                # os.system('cls')
                 globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
 
                 if time_difference(tradeTime,stoppingTime) > 0:
