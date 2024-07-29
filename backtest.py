@@ -182,10 +182,12 @@ def backtest(instrument, candles, earliest):
             first_candle = True
             continue
         elif first_candle and not trigger_candle:
-            if abs(ohlc[1] - ohlc[-2]) <= 30 and ohlc[-1] >= trade_config["high"]:
+            if ohlc[-1] >= trade_config["high"]:
+                backtest_main_logger.info(f"[backtest][{fromdate}][TRIGGER] data={data}")
                 trigger_candle = True
-                trade_config["target"] = ohlc[1] + 50
-                trade_config["stoploss"] = ohlc[1] - 30
+                increment = backtest_params["ti"]
+                trade_config["target"] = ohlc[1] + 150
+                trade_config["stoploss"] = ohlc[1] - 120
                 entry_time = fromdate
                 entry = ohlc[1]
                 bought = True
@@ -195,7 +197,7 @@ def backtest(instrument, candles, earliest):
                 exitt = ohlc[-1]
                 trade_type = "TARGET"
                 profit = ohlc[-1] - trade_config['high']
-                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
+                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
                 sold = True
                 break
             elif ohlc[-1] <= trade_config['stoploss']:
@@ -203,7 +205,7 @@ def backtest(instrument, candles, earliest):
                 exitt = ohlc[-1]
                 trade_type = "STOPLOSS"
                 profit = ohlc[-1] - trade_config['high']
-                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
+                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
                 sold = True
                 break
     if not error and not sold and bought:
@@ -211,7 +213,7 @@ def backtest(instrument, candles, earliest):
         exitt = ohlc[-1]
         trade_type = "EXIT_3_15"
         profit = ohlc[-1] - trade_config['high']
-        csv_lines = [entry_time, exit_time, trade_type, entry, exitt, profit]
+        csv_lines = [entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
     return csv_lines
 
 def group_day_wise(data):
@@ -234,10 +236,10 @@ def get_dynamic_data(days, stock):
         "symboltoken": stock['token'],
         "interval": candle_time_mapping(1)
         }
-    while days > 0 and todate_date <= 0:
+    while days >= 0 and todate_date < 0:
         todate_date = min(0, -days + 30)
         fromdate = time_calc(days = -days, minutes=15, hours=9, replace=True)
-        todate = time_calc(days = todate_date, minutes=30, hours=15, replace=True)
+        todate = time_calc(days = todate_date, minutes=15, hours=15, replace=True)
         backtest_main_logger.info(f"Getting dynamic data for {fromdate} -> {todate}")
         historicParam['fromdate'] = fromdate
         historicParam['todate'] = todate
