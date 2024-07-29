@@ -182,10 +182,10 @@ def backtest(instrument, candles, earliest):
             first_candle = True
             continue
         elif first_candle and not trigger_candle:
-            if ohlc[-1] >= trade_config["high"]:
+            if abs(ohlc[1] - ohlc[-2]) <= 30 and ohlc[-1] >= trade_config["high"]:
                 trigger_candle = True
-                trade_config["target"] = ohlc[1] + abs(ohlc[1] - trade_config['low'])
-                trade_config["stoploss"] = ohlc[1] - (abs(ohlc[1] - trade_config['low']) // 2)
+                trade_config["target"] = ohlc[1] + 50
+                trade_config["stoploss"] = ohlc[1] - 30
                 entry_time = fromdate
                 entry = ohlc[1]
                 bought = True
@@ -266,7 +266,7 @@ def iterate_filtered_stocks():
         data = []
         csv_header = ["Entry Time", "Exit Time", "Trade Type", "Entry", "Exit", "Profit"]
         data.append(csv_header.copy())
-        filename = f"backtest/{instrument['name']}.csv"
+        filename = f"backtest/{instrument['name']}_{backtest_params['file_suffix']}.csv"
         stocks_data = get_dynamic_data(backtest_params['earliest'], instrument)
         for back_day, candles in stocks_data.items():
             backtime = date_difference(back_day)

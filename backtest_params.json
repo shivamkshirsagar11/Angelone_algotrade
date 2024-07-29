@@ -1,9 +1,10 @@
 {
-    "fi":30,
-    "si":3,
-    "start_time_hr":12,
+    "fi":15,
+    "si":5,
+    "start_time_hr":9,
     "start_time_min":15,
     "end_time_hr":15,
     "end_time_min":15,
-    "earliest":365
+    "earliest":365,
+    "file_suffix":"tgt_50"
 }

@@ -1,16 +1,21 @@
 from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
-from threading import Thread
+from threading import Thread, Lock
 from file_handler import read_file
 from authentication import processLogin
 from datetime import datetime, timedelta
 import json
 import time
-import random
+import os
+from rich.console import Console
+from rich.table import Table
 
 sObj = processLogin()
 
 config = {}
 filtered_stocks = []
+rows = []
+cols = []
+lock = Lock()
 
 def read_filtered():
     globals()['filtered_stocks'] = read_file('filtered_dict_local.json')
@@ -42,7 +47,7 @@ def TRADE_STOCK(**params):
         print(f"Selling stock at price = {params['price']}")
     defaultParams = {
         "variety": "NORMAL",
-        "tradingsymbol": "IDEA-EQ",
+        "tradingsymbol": "ASHOKLEY-EQ",
         "symboltoken": "14366",
         "transactiontype": "BUY",
         "exchange": "NSE",
@@ -61,8 +66,6 @@ def TRADE_STOCK(**params):
         print("Stock sold..................")
     print(f"Order ID: {orderid}")
 
-# BUY_STOCK()
-# time.sleep(100)
 def time_calc(days=0, hours=0, minutes=0, seconds=0, ttime='', replace=False):
     ttime = datetime.now() if ttime == '' else datetime.strptime(ttime, "%Y-%m-%d %H:%M")
     ttime = ttime - timedelta(days=abs(days)) if days < 0 else ttime + timedelta(days=days)
@@ -129,7 +132,6 @@ def get_historic_data(historic_params, start_time,filename='garbage.txt', increm
     with open(filename, 'w') as f:
         f.writelines(log_lines)
 
-
 if trading_params["testing"] is False and trading_params["historicData"] is True:
     read_filtered()
     start_time = time_calc(days=-trading_params['earliest'], hours=9, minutes=15, replace=True)
@@ -181,7 +183,7 @@ def getFirstCandle(historicParam):
     data = data['data'][0]
     return data
 
-def trading_for_stock(stock, filename):
+def trading_for_stock(stock, filename, index):
     try:
         token = stock['token']
         firstCandle = None
@@ -193,25 +195,43 @@ def trading_for_stock(stock, filename):
         target = None
         stopLoss = None
         isBought = False
+        isSold = False
         while not isCompleted:
             try:
                 data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": [f"{token}"]})
                 data = data['data']['fetched'][0]
                 ltp = float(data['ltp'])
                 tradeTime = data['exchFeedTime']
-                print(f"[{stock['symbol']}] {convert_utc_to_ist(tradeTime)}, {firstCandle}, {time_difference(tradeTime,stoppingTime), {stoppingTime}}")
+                
+                # os.system('cls')
+                globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
 
                 if time_difference(tradeTime,stoppingTime) > 0:
                     log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][TIMEOUT] Preparing for exit...\n")
                     if not isBought:
                         log_lines.append(f"[NO-ENTRY-EXIT] No entry for stock\n")
                     else:
+                        defaultParams = {
+                        "variety": "NORMAL",
+                        "tradingsymbol": f"{stock['symbol']}",
+                        "symboltoken": f"{stock['token']}",
+                        "transactiontype": "SELL",
+                        "exchange": "NSE",
+                        "ordertype": "LIMIT",
+                        "producttype": "INTRADAY",
+                        "duration": "DAY",
+                        "price": f"{ltp}",
+                        "quantity": "1"
+                        }
+                        TRADE_STOCK(**defaultParams)
+                        isSold = True
                         log_lines.append(f"[SELL] selling the stock as end of market time\n")
                     log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)\n")
+                    globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
                     break
 
                 if firstCandle is None:
-                    start_time = time_calc(hours=9, minutes=15, replace=True)
+                    start_time = time_calc(hours=time.localtime().tm_hour, minutes=time.localtime().tm_min, replace=True)
                     stop_time = time_calc(minutes=trading_params["increment"] - 1, ttime=start_time)
                     print(start_time, stop_time, candle_time_mapping(trading_params["increment"]))
                     historicParam={
@@ -228,39 +248,84 @@ def trading_for_stock(stock, filename):
                     LOW = low
                     CLOSE = close
                     candleMeet = True
-                    target = HIGH + abs(LOW - HIGH)
-                    stopLoss = round(LOW / 1.00025, 2)
+                    target = HIGH + 0.5
+                    stopLoss = HIGH - 0.5
                     log_lines.append(f"{trading_params['increment']} Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
                     log_lines.append(f"Calculated: Target = {target}, StopLoss = {stopLoss}\n")
-                    print(f"[{stock['symbol']}]Calculated: Entry: {HIGH}, Target = {target}, StopLoss = {stopLoss}\n")
+                    # print(f"[{stock['symbol']}]Calculated: Entry: {HIGH}, Target = {target}, StopLoss = {stopLoss}\n")
                 
                 elif firstCandle is not None and candleMeet is True and not isBought:
                     if ltp >= HIGH:
                         log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][BUY] Price={ltp}\n")
                         isBought = True
+                        defaultParams = {
+                        "variety": "NORMAL",
+                        "tradingsymbol": f"{stock['symbol']}",
+                        "symboltoken": f"{stock['token']}",
+                        "transactiontype": "BUY",
+                        "exchange": "NSE",
+                        "ordertype": "LIMIT",
+                        "producttype": "INTRADAY",
+                        "duration": "DAY",
+                        "price": f"{ltp}",
+                        "quantity": "1"
+                        }
+                        TRADE_STOCK(**defaultParams)
                 
                 elif firstCandle is not None and candleMeet is True and isBought:
                     if ltp >= target:
                         log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] Target = {target} is Hit, price = {ltp}\n")
                         log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)")
+                        defaultParams = {
+                        "variety": "NORMAL",
+                        "tradingsymbol": f"{stock['symbol']}",
+                        "symboltoken": f"{stock['token']}",
+                        "transactiontype": "SELL",
+                        "exchange": "NSE",
+                        "ordertype": "LIMIT",
+                        "producttype": "INTRADAY",
+                        "duration": "DAY",
+                        "price": f"{ltp}",
+                        "quantity": "1"
+                        }
+                        TRADE_STOCK(**defaultParams)
+                        isSold = True
+                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
                         break
                     if ltp <= stopLoss:
                         log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] StopLoss = {stopLoss} is Met, price = {ltp}\n")
                         log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)")
+                        defaultParams = {
+                        "variety": "NORMAL",
+                        "tradingsymbol": f"{stock['symbol']}",
+                        "symboltoken": f"{stock['token']}",
+                        "transactiontype": "SELL",
+                        "exchange": "NSE",
+                        "ordertype": "LIMIT",
+                        "producttype": "INTRADAY",
+                        "duration": "DAY",
+                        "price": f"{ltp}",
+                        "quantity": "1"
+                        }
+                        TRADE_STOCK(**defaultParams)
+                        isSold = True
+                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
                         break            
-                time.sleep(3 + random.uniform(0.01, 0.1))
+                time.sleep(2)
             except Exception as e:
                 print(e)
                 print(token)
                 time.sleep(3)
         with open(filename, 'w') as f:
             f.writelines(log_lines)
+            globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
         return
     except Exception as e:
         print(e)
         print(token)
         with open(filename, 'w') as f:
             f.writelines(log_lines)
+        globals()['rows'][index] = ["ERROR", str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
         return
 
 
@@ -316,22 +381,48 @@ def wait_for_stocks_files(fileprefix:str=trading_params['increment']):
     os.system(f"rename {trading_params['increment']}m.csv {trading_params['increment']}m-old.csv")
 
 
+def ping_console_table_thread():
+
+    console = Console()
+    while True:
+        table = Table(title="Stock Monitoring Console")
+        for i, col in enumerate(globals()['cols']):
+            if i % 2 == 0:
+                table.add_column(col, justify="center", style="cyan")
+            else:
+                table.add_column(col, justify="center", style="magenta")
+
+        for row in globals()['rows']:
+            table.add_row(*row)    
+        console.clear()
+        console.print(table)
+        time.sleep(1)
+
+
 if trading_params["testing"] is False and trading_params["historicData"] is False:
     wait_for_stocks_files()
     read_filtered()
     sObj.timeout = trading_params["increment"] * 60
     threads = []
-    for stock in filtered_stocks:
-        thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt"))
+    globals()['rows'] = [[] for _ in range(len(filtered_stocks))]
+    for index, stock in enumerate(filtered_stocks):
+        thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt", index))
         threads.append(thread)
         thread.start()
-        if len(threads) % 3 == 0:
-            time.sleep(1)
+        time.sleep(1)
+    
+
+    
+    globals()['rows'] = [[] for _ in range(len(threads))]
+    globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold"]
+
+    thread = Thread(target=ping_console_table_thread)
+    threads.append(thread)
+    thread.start()
 
     for thread in threads:
-        thread.join() 
-
-
+        thread.join()
+ 
 if trading_params["testing"] is True:
     print("....buy sell stock demo....")
 
@@ -339,17 +430,17 @@ if trading_params["testing"] is True:
         if i % 2 == 0:
             defaultParams = {
             "variety": "NORMAL",
-            "tradingsymbol": "IDEA-EQ",
-            "symboltoken": "14366",
+            "tradingsymbol": "ASHOKLEY-EQ",
+            "symboltoken": "212",
             "transactiontype": "BUY",
             "exchange": "NSE",
-            "ordertype": "MARKET",
+            "ordertype": "LIMIT",
             "producttype": "INTRADAY",
             "duration": "DAY",
             "price": "16.59",
             "quantity": "1"
             }
-            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": ["14366"]})
+            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": ["212"]})
             data = data['data']['fetched'][0]
             defaultParams['price'] = data['ltp']
             TRADE_STOCK(**defaultParams)
@@ -358,17 +449,17 @@ if trading_params["testing"] is True:
         elif i % 2:
             defaultParams = {
             "variety": "NORMAL",
-            "tradingsymbol": "IDEA-EQ",
-            "symboltoken": "14366",
+            "tradingsymbol": "ASHOKLEY-EQ",
+            "symboltoken": "212",
             "transactiontype": "SELL",
             "exchange": "NSE",
-            "ordertype": "MARKET",
+            "ordertype": "LIMIT",
             "producttype": "INTRADAY",
             "duration": "DAY",
             "price": "16.59",
             "quantity": "1"
             }
-            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": ["14366"]})
+            data = sObj.getMarketData(mode="FULL", exchangeTokens={"NSE": ["212"]})
             data = data['data']['fetched'][0]
             defaultParams['price'] = data['ltp']
             TRADE_STOCK(**defaultParams)

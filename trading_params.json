@@ -1,7 +1,7 @@
 {
-    "increment":5,
+    "increment":1,
     "earliest":0,
     "latest":0,
-    "historicData":true,
+    "historicData":false,
     "testing":false
 }
