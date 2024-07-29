@@ -224,8 +224,8 @@ def trading_for_stock(stock, filename, index):
                     break
 
                 if firstCandle is None:
-                    start_time = time_calc(hours=time.localtime().tm_hour, minutes=time.localtime().tm_min, replace=True)
-                    stop_time = time_calc(minutes=trading_params["increment"] - 1, ttime=start_time)
+                    start_time = time_calc(hours=9, minutes=15, replace=True)
+                    stop_time = time_calc(minutes=trading_params["increment"], ttime=start_time)
                     print(start_time, stop_time, candle_time_mapping(trading_params["increment"]))
                     historicParam={
                     "exchange": stock['exch_seg'],
@@ -241,8 +241,8 @@ def trading_for_stock(stock, filename, index):
                     LOW = low
                     CLOSE = close
                     candleMeet = True
-                    target = HIGH + 0.5
-                    stopLoss = HIGH - 0.5
+                    target = HIGH + abs(HIGH - LOW)
+                    stopLoss = LOW
                     log_lines.append(f"{trading_params['increment']} Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
                     log_lines.append(f"Calculated: Target = {target}, StopLoss = {stopLoss}\n")
                     # print(f"[{stock['symbol']}]Calculated: Entry: {HIGH}, Target = {target}, StopLoss = {stopLoss}\n")
