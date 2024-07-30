@@ -5,9 +5,10 @@ from authentication import processLogin
 from datetime import datetime, timedelta
 import json
 import time
-import os
+import random
 from rich.console import Console
 from rich.table import Table
+import shutil
 
 sObj = processLogin()
 
@@ -237,15 +238,14 @@ def trading_for_stock(stock, filename, index):
                     [_, OPEN, high, low, close,_] = getFirstCandle(historicParam)
                     firstCandle = True
                     OPEN = OPEN
-                    HIGH = high
+                    HIGH = round(high * 1.00025)
                     LOW = low
                     CLOSE = close
                     candleMeet = True
-                    target = HIGH + abs(HIGH - LOW)
+                    target = round(HIGH + 2 * abs(HIGH - LOW), 2)
                     stopLoss = LOW
                     log_lines.append(f"{trading_params['increment']} Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
                     log_lines.append(f"Calculated: Target = {target}, StopLoss = {stopLoss}\n")
-                    # print(f"[{stock['symbol']}]Calculated: Entry: {HIGH}, Target = {target}, StopLoss = {stopLoss}\n")
                 
                 elif firstCandle is not None and candleMeet is True and not isBought:
                     if ltp >= HIGH:
@@ -304,11 +304,11 @@ def trading_for_stock(stock, filename, index):
                         isSold = True
                         globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
                         break            
-                time.sleep(2)
+                time.sleep(3)
             except Exception as e:
                 print(e)
                 print(token)
-                time.sleep(3)
+                time.sleep(9 + random.uniform(0.2, 0.9))
         with open(filename, 'w') as f:
             f.writelines(log_lines)
             globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
@@ -329,7 +329,7 @@ def wait_till_next_minute(delta=0):
     time.sleep(60 - delta - time.localtime().tm_sec)
 
 
-def read_stocks_and_filter(file_path):
+def read_stocks_and_filter(file_path, filterit=True):
     import pandas as pd
     # Load the CSV file
     data = pd.read_csv(file_path)
@@ -338,7 +338,9 @@ def read_stocks_and_filter(file_path):
     data['% Chg'] = data['% Chg'].str.rstrip('%').astype(float)
     
     # Filter the stocks with percentage change between 1.25 and 2.5
-    filtered_stocks = data[(data['% Chg'] >= 1.25) & (data['% Chg'] <= 2.5)]
+    filtered_stocks = data.copy()
+    if filterit:
+        filtered_stocks = data[(data['% Chg'] >= 1.5) & (data['% Chg'] <= 2.5)]
     
     # Append "-EQ" to the stock symbols
     filtered_stocks['Symbol'] = filtered_stocks['Symbol'] + '-EQ'
@@ -348,18 +350,25 @@ def read_stocks_and_filter(file_path):
     
     return stock_symbols
 
-def wait_for_stocks_files(fileprefix:str=trading_params['increment']):
+def wait_for_stocks_files():
     data = None
     import os
-    file_found = False
-    print(f"Waiting for {fileprefix}m.csv....")
-    while not file_found:
-        if os.path.exists(f"{fileprefix}m.csv") and os.path.isfile(f"{fileprefix}m.csv"):
-            file_found = True
-            print(f"{fileprefix}m.csv Found!")
-        else:
-            time.sleep(0.05)
-    data = read_stocks_and_filter(f"{fileprefix}m.csv")
+    
+    files_phase_1 = os.listdir("filter_phase_1")
+    files_phase_1 = [f for f in files_phase_1 if os.path.isfile(os.path.join("filter_phase_1", f))]
+    
+    data = []
+    for file in files_phase_1:
+        data.extend(read_stocks_and_filter(f"filter_phase_1/{file}"))
+    
+    files_phase_2 = os.listdir("filter_phase_2")
+    files_phase_2 = [f for f in files_phase_2 if os.path.isfile(os.path.join("filter_phase_2", f))]
+
+
+    for file in files_phase_2:
+        data.extend(read_stocks_and_filter(f"filter_phase_2/{file}", False))
+    
+    data = list(set(data))
     
     print("saving stocks to loacal filter json file...")
     with open("filter_local.json", 'w') as file:
@@ -371,7 +380,7 @@ def wait_for_stocks_files(fileprefix:str=trading_params['increment']):
     
     print("filtering the stocks and saving important information...")
     os.system("python utility.py")
-    os.system(f"rename {trading_params['increment']}m.csv {trading_params['increment']}m-old.csv")
+    # os.system(f"rename {trading_params['increment']}m.csv {trading_params['increment']}m-old.csv")
 
 
 def ping_console_table_thread():
@@ -394,27 +403,27 @@ def ping_console_table_thread():
 
 if trading_params["testing"] is False and trading_params["historicData"] is False:
     wait_for_stocks_files()
-    read_filtered()
-    sObj.timeout = trading_params["increment"] * 60
-    threads = []
-    globals()['rows'] = [[] for _ in range(len(filtered_stocks))]
-    for index, stock in enumerate(filtered_stocks):
-        thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt", index))
-        threads.append(thread)
-        thread.start()
-        time.sleep(1)
+    # read_filtered()
+    # sObj.timeout = trading_params["increment"] * 60
+    # threads = []
+    # globals()['rows'] = [[] for _ in range(len(filtered_stocks))]
+    # for index, stock in enumerate(filtered_stocks):
+    #     thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt", index))
+    #     threads.append(thread)
+    #     thread.start()
+    #     time.sleep(1)
     
 
     
-    globals()['rows'] = [[] for _ in range(len(threads))]
-    globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold"]
+    # globals()['rows'] = [[] for _ in range(len(threads))]
+    # globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold"]
 
-    thread = Thread(target=ping_console_table_thread)
-    threads.append(thread)
-    thread.start()
+    # thread = Thread(target=ping_console_table_thread)
+    # threads.append(thread)
+    # thread.start()
 
-    for thread in threads:
-        thread.join()
+    # for thread in threads:
+    #     thread.join()
  
 if trading_params["testing"] is True:
     print("....buy sell stock demo....")

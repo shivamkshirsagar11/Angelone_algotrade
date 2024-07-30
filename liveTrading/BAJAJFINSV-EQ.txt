@@ -1,3 +1,0 @@
-[19-Jul-2024 10:04:32][TIMEOUT] Preparing for exit...
-[NO-ENTRY-EXIT] No entry for stock
-[STOPPING-MONITOR] Stopping monitoring for stock :-)
