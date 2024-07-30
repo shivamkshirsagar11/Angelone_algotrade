@@ -403,27 +403,27 @@ def ping_console_table_thread():
 
 if trading_params["testing"] is False and trading_params["historicData"] is False:
     wait_for_stocks_files()
-    # read_filtered()
-    # sObj.timeout = trading_params["increment"] * 60
-    # threads = []
-    # globals()['rows'] = [[] for _ in range(len(filtered_stocks))]
-    # for index, stock in enumerate(filtered_stocks):
-    #     thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt", index))
-    #     threads.append(thread)
-    #     thread.start()
-    #     time.sleep(1)
+    read_filtered()
+    sObj.timeout = trading_params["increment"] * 60
+    threads = []
+    globals()['rows'] = [[] for _ in range(len(filtered_stocks))]
+    for index, stock in enumerate(filtered_stocks):
+        thread = Thread(target=trading_for_stock, args=(stock, f"liveTrading/{stock['symbol']}.txt", index))
+        threads.append(thread)
+        thread.start()
+        time.sleep(1)
     
 
     
-    # globals()['rows'] = [[] for _ in range(len(threads))]
-    # globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold"]
+    globals()['rows'] = [[] for _ in range(len(threads))]
+    globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold"]
 
-    # thread = Thread(target=ping_console_table_thread)
-    # threads.append(thread)
-    # thread.start()
+    thread = Thread(target=ping_console_table_thread)
+    threads.append(thread)
+    thread.start()
 
-    # for thread in threads:
-    #     thread.join()
+    for thread in threads:
+        thread.join()
  
 if trading_params["testing"] is True:
     print("....buy sell stock demo....")
