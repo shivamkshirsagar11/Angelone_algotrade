@@ -1,0 +1,5 @@
+5 Minute candle found: OHLC(5630.0, 5721, 5630.0, 5705.45)
+Calculated: Target = 5812.0, StopLoss = 5630.0
+[31-Jul-2024 09:38:57][BUY] Price=5726.0
+[31-Jul-2024 11:13:17][SELL] Target = 5812.0 is Hit, price = 5812.95
+[STOPPING-MONITOR] Stopping monitoring for stock :-)

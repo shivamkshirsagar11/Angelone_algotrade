@@ -183,10 +183,11 @@ def trading_for_stock(stock, filename, index):
     try:
         token = stock['token']
         firstCandle = None
-        OPEN = HIGH = LOW = CLOSE = None
+        OPEN = HIGH = LOW = CLOSE = ENTRY = None
         isCompleted = False
         log_lines = []
-        stoppingTime = get_stopping_time(hour=15, minute=15)
+        stoppingTime = get_stopping_time(hour=15, minute=14)
+        exitTime = get_stopping_time(hour=10, minute=45)
         candleMeet = False
         target = None
         stopLoss = None
@@ -198,9 +199,9 @@ def trading_for_stock(stock, filename, index):
                 data = data['data']['fetched'][0]
                 ltp = float(data['ltp'])
                 tradeTime = data['exchFeedTime']
-                globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
+                globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "LIVE", "TBA"]
 
-                if time_difference(tradeTime,stoppingTime) > 0:
+                if (not isBought and time_difference(tradeTime,exitTime) > 0) or time_difference(tradeTime,stoppingTime) > 0:
                     log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][TIMEOUT] Preparing for exit...\n")
                     if not isBought:
                         log_lines.append(f"[NO-ENTRY-EXIT] No entry for stock\n")
@@ -221,7 +222,11 @@ def trading_for_stock(stock, filename, index):
                         isSold = True
                         log_lines.append(f"[SELL] selling the stock as end of market time\n")
                     log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)\n")
-                    globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
+                    if ENTRY:
+                        profit = str(ltp - ENTRY)
+                    else:
+                        profit = str(ltp - HIGH)
+                    globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "TIMEOUT", profit]
                     break
 
                 if firstCandle is None:
@@ -238,11 +243,11 @@ def trading_for_stock(stock, filename, index):
                     [_, OPEN, high, low, close,_] = getFirstCandle(historicParam)
                     firstCandle = True
                     OPEN = OPEN
-                    HIGH = round(high * 1.00025)
+                    HIGH = round(high * 1.00025, 2)
                     LOW = low
                     CLOSE = close
                     candleMeet = True
-                    target = round(HIGH + 2 * abs(HIGH - LOW), 2)
+                    target = round(HIGH + abs(HIGH - LOW), 2)
                     stopLoss = LOW
                     log_lines.append(f"{trading_params['increment']} Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
                     log_lines.append(f"Calculated: Target = {target}, StopLoss = {stopLoss}\n")
@@ -264,6 +269,7 @@ def trading_for_stock(stock, filename, index):
                         "quantity": "1"
                         }
                         TRADE_STOCK(**defaultParams)
+                        ENTRY = ltp
                 
                 elif firstCandle is not None and candleMeet is True and isBought:
                     if ltp >= target:
@@ -283,7 +289,11 @@ def trading_for_stock(stock, filename, index):
                         }
                         TRADE_STOCK(**defaultParams)
                         isSold = True
-                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
+                        if ENTRY:
+                            profit = str(ltp - ENTRY)
+                        else:
+                            profit = str(ltp - HIGH)
+                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "TARGET", profit]
                         break
                     if ltp <= stopLoss:
                         log_lines.append(f"[{convert_utc_to_ist(tradeTime)}][SELL] StopLoss = {stopLoss} is Met, price = {ltp}\n")
@@ -302,7 +312,11 @@ def trading_for_stock(stock, filename, index):
                         }
                         TRADE_STOCK(**defaultParams)
                         isSold = True
-                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
+                        if ENTRY:
+                            profit = str(ltp - ENTRY)
+                        else:
+                            profit = str(ltp - HIGH)
+                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "STOPLOSS", profit]
                         break            
                 time.sleep(3)
             except Exception as e:
@@ -311,14 +325,14 @@ def trading_for_stock(stock, filename, index):
                 time.sleep(9 + random.uniform(0.2, 0.9))
         with open(filename, 'w') as f:
             f.writelines(log_lines)
-            globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
+            globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "LIVE", "TBA"]
         return
     except Exception as e:
         print(e)
         print(token)
         with open(filename, 'w') as f:
             f.writelines(log_lines)
-        globals()['rows'][index] = ["ERROR", str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO"]
+        globals()['rows'][index] = ["ERROR", str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "N/A", "N/A"]
         return
 
 
@@ -340,7 +354,7 @@ def read_stocks_and_filter(file_path, filterit=True):
     # Filter the stocks with percentage change between 1.25 and 2.5
     filtered_stocks = data.copy()
     if filterit:
-        filtered_stocks = data[(data['% Chg'] >= 1.5) & (data['% Chg'] <= 2.5)]
+        filtered_stocks = data[(data['% Chg'] >= 1.4) & (data['% Chg'] <= 2.5)]
     
     # Append "-EQ" to the stock symbols
     filtered_stocks['Symbol'] = filtered_stocks['Symbol'] + '-EQ'
@@ -416,7 +430,7 @@ if trading_params["testing"] is False and trading_params["historicData"] is Fals
 
     
     globals()['rows'] = [[] for _ in range(len(threads))]
-    globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold"]
+    globals()['cols'] = ["Time", "Stock", "Entry", "Target", "StopLoss", "LTP", "isBought", "isSold", "TradeType", "Profit"]
 
     thread = Thread(target=ping_console_table_thread)
     threads.append(thread)
