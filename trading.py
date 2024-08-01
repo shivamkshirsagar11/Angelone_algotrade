@@ -243,6 +243,7 @@ def trading_for_stock(stock, filename, index):
                     [_, OPEN, high, low, close,_] = getFirstCandle(historicParam)
                     firstCandle = True
                     OPEN = OPEN
+                    SIZE = abs(HIGH - LOW)
                     HIGH = round(high * 1.00025, 2)
                     LOW = low
                     CLOSE = close
@@ -251,6 +252,11 @@ def trading_for_stock(stock, filename, index):
                     stopLoss = LOW
                     log_lines.append(f"{trading_params['increment']} Minute candle found: OHLC{OPEN, HIGH, LOW, CLOSE}\n")
                     log_lines.append(f"Calculated: Target = {target}, StopLoss = {stopLoss}\n")
+                    if ((SIZE / LOW) * 100) > 1.5:
+                        log_lines.append(f"Candle does not met requirement for <= 1.5%, Actuall: {((SIZE / LOW) * 100)}\n")
+                        log_lines.append(f"[{tradeTime}] Exiting from maket for stock...\n")
+                        globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "NO", "NO", "EXIT@>1.5", "NIL"]
+                        break
                 
                 elif firstCandle is not None and candleMeet is True and not isBought:
                     if ltp >= HIGH:
