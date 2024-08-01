@@ -1,0 +1,4 @@
+[2024-07-08 09:15] Started Monitoring Stock...
+[2024-07-08 09:15] First Candle Data: OHLC((632.05, 642.0, 629.0, 637.55))
+[2024-07-08 09:15] [BUY=637.55] OHLC((632.05, 642.0, 629.0, 637.55))
+[2024-07-08 09:33] [SELL] Selling the stock as time is 3:15

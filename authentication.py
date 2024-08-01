@@ -19,11 +19,15 @@ def do_login():
         jwt = data['jwtToken']
         jwt = jwt.replace('Bearer ', '')
         feed = data['feedToken']
-        globals()['config'].update({'jwtToken':jwt, 'feedToken':feed}) 
+        globals()['config'].update({'jwtToken':jwt, 'feedToken':feed})
+    return sObj 
 
 def update_secreats():
     save_file('complete_config_local.json', globals()['config'])
 
-read_secreats()
-do_login()
-update_secreats()
+def processLogin():
+    read_secreats()
+    sObj = do_login()
+    update_secreats()
+
+    return sObj

@@ -164,3 +164,4 @@ cython_debug/
 *.exe
 config.json
 *local*
+trading_params.json

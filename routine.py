@@ -1,12 +1,10 @@
 import os
 
-os.system("cls")
-os.system(".\\.venv\\Scripts\\activate")
-os.system("cls")
-os.system("python authentication.py")
-os.system("cls")
-os.system("python download_assets.py")
-os.system("cls")
-os.system("utility.py")
-os.system("cls")
-os.system("deactivate")
+
+def start_routine(startingMsg="Starting trading", script_names=[]):
+    os.system(f"echo {startingMsg}...")
+    for script in script_names:
+        os.system(f"echo Executing {script}.py")
+        os.system(f"python {script}.py")
+
+start_routine("Starting Backtesting", script_names=["utility", "backtest"])

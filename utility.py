@@ -22,7 +22,12 @@ def filter_dict(data, filters):
                     break
 
         if all_filters_match is True:
-            filtered.append(ticker)
+            temp = {}
+            temp['token'] = ticker['token']
+            temp['name'] = ticker['name']
+            temp['symbol'] = ticker['symbol']
+            temp['exch_seg'] = ticker['exch_seg']
+            filtered.append(temp)
     save_file('filtered_dict_local.json', filtered)
 
 def filter_ticker():
