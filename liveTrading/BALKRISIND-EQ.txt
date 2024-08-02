@@ -1,6 +1,0 @@
-5 Minute candle found: OHLC(3275.2, 3318, 3275.2, 3308.1)
-Calculated: Target = 3360.8, StopLoss = 3275.2
-[31-Jul-2024 11:13:05][BUY] Price=3318.0
-[31-Jul-2024 15:15:04][TIMEOUT] Preparing for exit...
-[SELL] selling the stock as end of market time
-[STOPPING-MONITOR] Stopping monitoring for stock :-)

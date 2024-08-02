@@ -1,0 +1,4 @@
+5 Minute candle found: OHLC(484.9, 498.42, 484.8, 496.65)
+Calculated: Target = 512.04, StopLoss = 484.8
+Candle does not met requirement for <= 1.5%, Actuall: 2.7846534653465347
+[02-Aug-2024 09:30:36] Exiting from maket for stock...
