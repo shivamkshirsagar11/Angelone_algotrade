@@ -1,11 +1,11 @@
 {
     "fi":30,
-    "si":5,
+    "si":1,
     "ti":1,
     "start_time_hr":9,
     "start_time_min":15,
     "end_time_hr":15,
     "end_time_min":15,
-    "earliest":210,
-    "file_suffix":""
+    "earliest":365,
+    "file_suffix":"SELL"
 }

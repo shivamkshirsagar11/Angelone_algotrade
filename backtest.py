@@ -141,7 +141,8 @@ def backtest(instrument, candles, earliest):
         "low":None,
         "close":None,
         "target":None,
-        "stoploss":None
+        "stoploss":None,
+        "entry":None
     }
     entry_time = ''
     exit_time = ''
@@ -150,7 +151,6 @@ def backtest(instrument, candles, earliest):
     exitt = ''
     profit = ''
     csv_lines = []
-    waiting_for_sell = True
     sold = False
     bought = False
     error = False
@@ -158,6 +158,7 @@ def backtest(instrument, candles, earliest):
     iterated_candles = 0
     start_time = time_calc(days = -earliest, minutes=backtest_params["start_time_min"], hours=backtest_params["start_time_hr"], replace=True)
     stop_time = get_stopping_time(hour=backtest_params["end_time_hr"], minute=backtest_params["end_time_min"], today=start_time)
+    TRADECALL = None
     while True:
         data = batchwise_get_candle_from_bulk(candles, increment, iterated_candles, start_time)
         ohlc = data[:4]
@@ -167,7 +168,21 @@ def backtest(instrument, candles, earliest):
         if time_difference(fromdate, stop_time) >= 0:
             backtest_main_logger.info(f"[backtest][time difference] {fromdate}:{todate}, {time_difference(fromdate, stop_time)}")
             break
-
+        
+        if first_candle and TRADECALL is None:
+            if ohlc[0] and ohlc[-1] >= trade_config['high']:
+                TRADECALL = "BUY"
+            elif ohlc[0] and ohlc[-1] <= trade_config['high']:
+                TRADECALL = "SELL"
+                # trade_config["target"] = trade_config["low"] - abs(trade_config["high"] - trade_config["low"])
+                # trade_config["target"] = round(trade_config['target'], 2)
+                # trade_config["stoploss"] = trade_config["high"]
+                # trade_config["entry"] = round(trade_config["low"] / 1.00025, 2)
+                trade_config["target"] = trade_config["low"] - 150
+                trade_config["target"] = round(trade_config['target'], 2)
+                trade_config["stoploss"] = trade_config["high"] + 120
+                trade_config["entry"] = round(trade_config["low"] / 1.00025, 2)
+ 
         if ohlc and not first_candle and ohlc[0] is None:
             backtest_main_logger.critical(f"[backtest] Some error occured so skipping this day")
             error = True
@@ -179,33 +194,55 @@ def backtest(instrument, candles, earliest):
             trade_config["low"] = ohlc[2]
             trade_config["close"] = ohlc[3]
             increment = backtest_params["si"]
+            trade_config["target"] = ohlc[1] + 150
+            trade_config["stoploss"] = ohlc[1] - 120
+            # trade_config["target"] = round(ohlc[1] + abs(ohlc[1] - ohlc[2]), 2)
+            # trade_config["stoploss"] = ohlc[1]
+            trade_config["entry"] = round(ohlc[1] * 1.0025, 2)
             first_candle = True
             continue
-        elif first_candle and not trigger_candle:
-            if ohlc[-1] >= trade_config["high"]:
-                backtest_main_logger.info(f"[backtest][{fromdate}][TRIGGER] data={data}")
-                trigger_candle = True
-                increment = backtest_params["ti"]
-                trade_config["target"] = ohlc[1] + 150
-                trade_config["stoploss"] = ohlc[1] - 120
+        elif TRADECALL == "BUY" and first_candle and not bought:
+            if ohlc[-1] >= trade_config['entry']:
                 entry_time = fromdate
-                entry = ohlc[1]
+                entry = ohlc[-1]
                 bought = True
-        elif first_candle and trigger_candle and waiting_for_sell:
+        elif TRADECALL == "BUY" and first_candle and bought:
             if ohlc[-1] >= trade_config['target']:
                 exit_time = fromdate
                 exitt = ohlc[-1]
                 trade_type = "TARGET"
-                profit = ohlc[-1] - trade_config['high']
-                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
+                profit = ohlc[-1] - entry
+                csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
                 sold = True
                 break
-            elif ohlc[-1] <= trade_config['stoploss']:
+            if ohlc[-1] <= trade_config['stoploss']:
                 exit_time = fromdate
                 exitt = ohlc[-1]
                 trade_type = "STOPLOSS"
-                profit = ohlc[-1] - trade_config['high']
-                csv_lines = [entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
+                profit = ohlc[-1] - entry
+                csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
+                sold = True
+                break
+        elif TRADECALL == "SELL" and first_candle and not sold:
+            if ohlc[-1] <= trade_config['entry']:
+                entry_time = fromdate
+                entry = ohlc[-1]
+                sold = True
+        elif TRADECALL == "SELL" and first_candle and sold:
+            if ohlc[-1] <= trade_config['target']:
+                exit_time = fromdate
+                exitt = ohlc[-1]
+                trade_type = "TARGET"
+                profit = entry - ohlc[-1]
+                csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
+                sold = True
+                break
+            if ohlc[-1] >= trade_config['stoploss']:
+                exit_time = fromdate
+                exitt = ohlc[-1]
+                trade_type = "STOPLOSS"
+                profit = entry - ohlc[-1]
+                csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
                 sold = True
                 break
     if not error and not sold and bought:
@@ -213,7 +250,7 @@ def backtest(instrument, candles, earliest):
         exitt = ohlc[-1]
         trade_type = "EXIT_3_15"
         profit = ohlc[-1] - trade_config['high']
-        csv_lines = [entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
+        csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
     return csv_lines
 
 def group_day_wise(data):
@@ -266,7 +303,7 @@ def iterate_filtered_stocks():
     for instrument in filtered_stocks:
         backtest_main_logger.info(f"[iterate_filtered_stocks] starting backtest for {instrument['name']}")
         data = []
-        csv_header = ["Entry Time", "Exit Time", "Trade Type", "Entry", "Exit", "Profit"]
+        csv_header = ["FIRSTCALL", "Entry Time", "Exit Time", "Trade Type", "Entry", "Exit", "Profit"]
         data.append(csv_header.copy())
         filename = f"backtest/{instrument['name']}_{backtest_params['file_suffix']}.csv"
         stocks_data = get_dynamic_data(backtest_params['earliest'], instrument)
