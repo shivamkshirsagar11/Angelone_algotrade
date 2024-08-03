@@ -155,6 +155,7 @@ def backtest(instrument, candles, earliest):
     bought = False
     error = False
     ohlc = None
+    bind = 15
     iterated_candles = 0
     start_time = time_calc(days = -earliest, minutes=backtest_params["start_time_min"], hours=backtest_params["start_time_hr"], replace=True)
     stop_time = get_stopping_time(hour=backtest_params["end_time_hr"], minute=backtest_params["end_time_min"], today=start_time)
@@ -165,91 +166,97 @@ def backtest(instrument, candles, earliest):
         iterated_candles, fromdate = data[4:]
         backtest_main_logger.info(f"[backtest][{fromdate}] data={data}")
 
-        if time_difference(fromdate, stop_time) >= 0:
-            backtest_main_logger.info(f"[backtest][time difference] {fromdate}:{todate}, {time_difference(fromdate, stop_time)}")
-            break
-        
-        if first_candle and TRADECALL is None:
-            if ohlc[0] and ohlc[-1] >= trade_config['high']:
-                TRADECALL = "BUY"
-            elif ohlc[0] and ohlc[-1] <= trade_config['high']:
-                TRADECALL = "SELL"
-                # trade_config["target"] = trade_config["low"] - abs(trade_config["high"] - trade_config["low"])
-                # trade_config["target"] = round(trade_config['target'], 2)
-                # trade_config["stoploss"] = trade_config["high"]
-                # trade_config["entry"] = round(trade_config["low"] / 1.00025, 2)
-                trade_config["target"] = trade_config["low"] - 150
-                trade_config["target"] = round(trade_config['target'], 2)
-                trade_config["stoploss"] = trade_config["high"] + 120
-                trade_config["entry"] = round(trade_config["low"] / 1.00025, 2)
- 
         if ohlc and not first_candle and ohlc[0] is None:
             backtest_main_logger.critical(f"[backtest] Some error occured so skipping this day")
             error = True
             break
-        elif not first_candle:
+
+        if time_difference(fromdate, stop_time) >= 0:
+            backtest_main_logger.info(f"[backtest][time difference] {fromdate}:{stop_time}, {time_difference(fromdate, stop_time)}")
+            break
+
+        if first_candle and (not bought and not sold):
+            SIZE = abs(trade_config['high'] - trade_config['low'])
+            if ohlc[0] and ohlc[-1] >= trade_config['high']:
+                TRADECALL = "BUY"
+                trade_config["target"] = round(trade_config['high'] + SIZE * 0.7, 2)
+                trade_config["stoploss"] = round(trade_config['low'] - SIZE * 0.3, 2)
+                if SIZE >= 350:
+                    trade_config["target"] = round(trade_config['high'] + 1.2 * SIZE, 2)
+                    trade_config["stoploss"] = round(trade_config['low'] - SIZE * 0.5, 2)
+                trade_config["entry"] = trade_config['high']
+            elif ohlc[0] and ohlc[-1] <= trade_config['high']:
+                TRADECALL = "SELL"
+                trade_config["target"] = round(trade_config["low"] - SIZE * 0.7, 2)
+                trade_config["stoploss"] = round(trade_config["high"] - SIZE * 0.3, 2)
+                if SIZE >= 350:
+                    trade_config["target"] = round(trade_config["low"] - 1.2 * SIZE, 2)
+                    trade_config["stoploss"] = round(trade_config['high'] - SIZE * 0.5, 2)
+                trade_config["entry"] = trade_config["low"]
+
+        if not first_candle:
             first_candle = True
             trade_config["open"] = ohlc[0]
             trade_config["high"] = ohlc[1]
             trade_config["low"] = ohlc[2]
             trade_config["close"] = ohlc[3]
             increment = backtest_params["si"]
-            trade_config["target"] = ohlc[1] + 150
-            trade_config["stoploss"] = ohlc[1] - 120
-            # trade_config["target"] = round(ohlc[1] + abs(ohlc[1] - ohlc[2]), 2)
-            # trade_config["stoploss"] = ohlc[1]
-            trade_config["entry"] = round(ohlc[1] * 1.0025, 2)
             first_candle = True
-            continue
         elif TRADECALL == "BUY" and first_candle and not bought:
-            if ohlc[-1] >= trade_config['entry']:
+            if ohlc[0] >= trade_config['entry']:
                 entry_time = fromdate
-                entry = ohlc[-1]
+                entry = ohlc[0]
                 bought = True
         elif TRADECALL == "BUY" and first_candle and bought:
-            if ohlc[-1] >= trade_config['target']:
+            if ohlc[0] >= trade_config['target']:
                 exit_time = fromdate
-                exitt = ohlc[-1]
+                exitt = ohlc[0]
                 trade_type = "TARGET"
-                profit = ohlc[-1] - entry
+                profit = ohlc[0] - entry
                 csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
                 sold = True
-                break
-            if ohlc[-1] <= trade_config['stoploss']:
+                return csv_lines
+            if ohlc[0] <= trade_config['stoploss']:
                 exit_time = fromdate
-                exitt = ohlc[-1]
+                exitt = ohlc[0]
                 trade_type = "STOPLOSS"
-                profit = ohlc[-1] - entry
+                profit = ohlc[0] - entry
                 csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
                 sold = True
-                break
+                return csv_lines
         elif TRADECALL == "SELL" and first_candle and not sold:
             if ohlc[-1] <= trade_config['entry']:
                 entry_time = fromdate
-                entry = ohlc[-1]
+                entry = ohlc[0]
                 sold = True
         elif TRADECALL == "SELL" and first_candle and sold:
-            if ohlc[-1] <= trade_config['target']:
+            if ohlc[0] <= trade_config['target']:
                 exit_time = fromdate
-                exitt = ohlc[-1]
+                exitt = ohlc[0]
                 trade_type = "TARGET"
-                profit = entry - ohlc[-1]
+                profit = entry - ohlc[0]
                 csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
-                sold = True
-                break
-            if ohlc[-1] >= trade_config['stoploss']:
+                bought = True
+                return csv_lines
+            if ohlc[0] >= trade_config['stoploss']:
                 exit_time = fromdate
-                exitt = ohlc[-1]
+                exitt = ohlc[0]
                 trade_type = "STOPLOSS"
-                profit = entry - ohlc[-1]
+                profit = entry - ohlc[0]
                 csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
-                sold = True
-                break
-    if not error and not sold and bought:
+                bought = True
+                return csv_lines
+    if ohlc[0] and TRADECALL == "BUY" and not error and (not sold) and bought:
         exit_time = stop_time
         exitt = ohlc[-1]
         trade_type = "EXIT_3_15"
-        profit = ohlc[-1] - trade_config['high']
+        profit = ohlc[-1] - entry
+        csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
+    elif ohlc[0] and TRADECALL == "SELL" and not error and (not bought) and sold:
+        exit_time = stop_time
+        exitt = ohlc[-1]
+        trade_type = "EXIT_3_15"
+        profit = entry - ohlc[-1]
         csv_lines = [TRADECALL, entry_time, exit_time, trade_type, entry, exitt, round(profit, 2)]
     return csv_lines
 

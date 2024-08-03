@@ -6,6 +6,6 @@
     "start_time_min":15,
     "end_time_hr":15,
     "end_time_min":15,
-    "earliest":365,
-    "file_suffix":"SELL"
+    "earliest":180,
+    "file_suffix":"BS_30"
 }
