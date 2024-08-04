@@ -179,19 +179,19 @@ def backtest(instrument, candles, earliest):
             SIZE = abs(trade_config['high'] - trade_config['low'])
             if ohlc[0] and ohlc[-1] >= trade_config['high']:
                 TRADECALL = "BUY"
-                trade_config["target"] = round(trade_config['high'] + SIZE * 0.7, 2)
-                trade_config["stoploss"] = round(trade_config['low'] - SIZE * 0.3, 2)
-                if SIZE >= 350:
-                    trade_config["target"] = round(trade_config['high'] + 1.2 * SIZE, 2)
-                    trade_config["stoploss"] = round(trade_config['low'] - SIZE * 0.5, 2)
+                trade_config["target"] = round(trade_config['high'] + SIZE * backtest_params['target_margin'], 2)
+                trade_config["stoploss"] = round(trade_config['low'] - SIZE * backtest_params['stoploss_margin'], 2)
+                if SIZE >= backtest_params['candle_size']:
+                    trade_config["target"] = round(trade_config['high'] + backtest_params['target_margin_second'] * SIZE, 2)
+                    trade_config["stoploss"] = round(trade_config['low'] - SIZE * backtest_params['stoploss_margin_second'], 2)
                 trade_config["entry"] = trade_config['high']
             elif ohlc[0] and ohlc[-1] <= trade_config['high']:
                 TRADECALL = "SELL"
-                trade_config["target"] = round(trade_config["low"] - SIZE * 0.7, 2)
-                trade_config["stoploss"] = round(trade_config["high"] - SIZE * 0.3, 2)
-                if SIZE >= 350:
-                    trade_config["target"] = round(trade_config["low"] - 1.2 * SIZE, 2)
-                    trade_config["stoploss"] = round(trade_config['high'] - SIZE * 0.5, 2)
+                trade_config["target"] = round(trade_config["low"] - SIZE * backtest_params['target_margin'], 2)
+                trade_config["stoploss"] = round(trade_config["high"] - SIZE * backtest_params['stoploss_margin'], 2)
+                if SIZE >= backtest_params['candle_size']:
+                    trade_config["target"] = round(trade_config["low"] - backtest_params['target_margin_second'] * SIZE, 2)
+                    trade_config["stoploss"] = round(trade_config['high'] - SIZE * backtest_params['stoploss_margin_second'], 2)
                 trade_config["entry"] = trade_config["low"]
 
         if not first_candle:
