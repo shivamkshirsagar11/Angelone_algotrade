@@ -239,6 +239,10 @@ def trading_for_stock(stock, filename, index):
                         }
                         TRADE_STOCK(**defaultParams)
                         isSold = True
+                        if ENTRY:
+                            profit = str(ltp - ENTRY)
+                        else:
+                            profit = str(ltp - HIGH)
                         log_lines.append(f"[SELL] selling the stock as end of market time price={ltp}\n")
                     elif isSold and TRADECALL == "SELL":
                         defaultParams = {
@@ -255,12 +259,12 @@ def trading_for_stock(stock, filename, index):
                         }
                         TRADE_STOCK(**defaultParams)
                         isBought = True
+                        if ENTRY:
+                            profit = str(ENTRY - ltp)
+                        else:
+                            profit = str(LOW - ltp)
                         log_lines.append(f"[BUY] Buying the stock as end of market time price={ltp}\n")
                     log_lines.append(f"[STOPPING-MONITOR] Stopping monitoring for stock :-)\n")
-                    if ENTRY:
-                        profit = str(ltp - ENTRY)
-                    else:
-                        profit = str(ltp - HIGH)
                     globals()['rows'][index] = [tradeTime, str(stock['symbol']), str(HIGH), str(target), str(stopLoss), str(ltp), "YES" if isBought else "NO", "YES" if isSold else "NO", "TIMEOUT", profit, TRADECALL]
                     break
 
